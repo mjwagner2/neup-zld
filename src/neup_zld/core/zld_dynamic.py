@@ -1,14 +1,15 @@
 import pyomo.environ as pyo
 
 
-def build_model(N, Schedule_elec, Schedule_effic, price_mults=None, cost_mults=None, process_mults=None, turbine_mults=1.0):
+
+def build_model(N, Schedule_elec, Schedule_effic, price_mults=None, cost_mults=None, process_mults=None, turbine_mults=1.0, circular_storage=True):
     
     
     # default dictionaries
     price_mults   = price_mults or {}
     cost_mults    = cost_mults or {}
     process_mults = process_mults or {}
-    
+    med_thermal_mult = float(process_mults.get("MED_thermal", 1.0))
 
     from core.zld_params import (
         add_sets,
@@ -34,7 +35,9 @@ def build_model(N, Schedule_elec, Schedule_effic, price_mults=None, cost_mults=N
     add_economic_params(model, price_scale=price_mults, cost_scale=cost_mults)
     add_zld_params(model, yield_scale=1.0)
     
-    
+    model.circular_storage        = circular_storage
+    model.m_cold_tes_init         = pyo.Param(initialize=0.0, mutable=True)
+    model.m_hot_tes_init          = pyo.Param(initialize=0.0, mutable=True)
     
     # variables 
     
@@ -65,10 +68,65 @@ def build_model(N, Schedule_elec, Schedule_effic, price_mults=None, cost_mults=N
     model.f_ion_link              = pyo.Var(model.T, model.links, model.ions, within=pyo.NonNegativeReals)      # units: kg/h,          ion flow between two processes
     model.li_recovered_ed         = pyo.Var(model.T, within=pyo.NonNegativeReals)                               # units: kg/h,          total Li recovered
     model.v_dot_cap               = pyo.Var(model.processes, within=pyo.NonNegativeReals)                       # units: m^3/day,       capacity of each process
+    model.v_dot_process_Delta_up  = pyo.Var(model.T, model.processes, domain=pyo.NonNegativeReals)
+    model.v_dot_process_Delta_dn  = pyo.Var(model.T, model.processes, domain=pyo.NonNegativeReals)
+    model.v_dot_brine_disposal = pyo.Var(model.T, model.processes, within=pyo.NonNegativeReals)
+
+    def prev_circular(T, t):
+        return T.prev(t) if t != T.first() else T.last()
+
     
-    
-    
-    
+ 
+    # Tracks upward changes in desalination process flow
+    def process_track_up(model, t, p):
+        if model.circular_storage:
+            t_prev = prev_circular(model.T, t)
+        else:
+            if t == model.T.first():
+                return model.v_dot_process_Delta_up[t, p] == 0
+            t_prev = model.T.prev(t)
+
+        return (model.v_dot_process_Delta_up[t, p] >= model.v_dot_in[t, p] - model.v_dot_in[t_prev, p])
+
+    model.process_track_up = pyo.Constraint(model.T, model.processes,rule=process_track_up)
+
+
+    # Tracks downward changes in desalination process flow
+    def process_track_down(model, t, p):
+        if model.circular_storage:
+            t_prev = prev_circular(model.T, t)
+        else:
+            if t == model.T.first():
+                return model.v_dot_process_Delta_dn[t, p] == 0
+            t_prev = model.T.prev(t)
+
+        return (model.v_dot_process_Delta_dn[t, p] >= model.v_dot_in[t_prev, p] - model.v_dot_in[t, p])
+
+    model.process_track_down = pyo.Constraint(model.T, model.processes, rule=process_track_down)
+
+
+
+   # def outgoing_concentrate_balance(m, t, p):
+    #    if p == "CRY":
+     #       return pyo.Constraint.Skip
+
+      #  outgoing = [(u, r) for (u, r) in m.links if u == p]
+
+       # return (m.v_dot_conc[t, p]== sum(m.v_dot_link[t, (p, r)] for (u, r) in outgoing) + m.v_dot_brine_disposal[t, p])
+
+#    model.outgoing_concentrate_balance = pyo.Constraint(model.T, model.processes, rule=outgoing_concentrate_balance)
+
+
+ #   def zld_enforce(m):
+  #      return sum(m.v_dot_brine_disposal[t, p] for t in m.T for p in m.processes if p != "CRY") <= 10.0
+
+   # model.zld_enforce = pyo.Constraint(rule=zld_enforce)
+
+
+
+
+
+
     
     # convert steam to power in the power cycle
     def steam_to_power(model, t):
@@ -116,19 +174,27 @@ def build_model(N, Schedule_elec, Schedule_effic, price_mults=None, cost_mults=N
     
     
     
-    def prev_circular(T, t):
-        return T.prev(t) if t != T.first() else T.last()
     
     # tracks power ramping upwards 
     def hpt_track_up(model, t):
-        t_prev = prev_circular(model.T,t)
+        if model.circular_storage:
+            t_prev = prev_circular(model.T,t)
+        else:
+            if t == model.T.first():
+                return model.m_dot_hpt_Delta_up[t] == 0
+            t_prev = t - 1
         return model.m_dot_hpt_Delta_up[t] >= model.m_dot_hpt[t] - model.m_dot_hpt[t_prev]
     model.hpt_track_up = pyo.Constraint(model.T, rule=hpt_track_up)
     
     
     # tracks power ramping downwards
     def hpt_track_down(model, t):
-        t_prev = prev_circular(model.T,t)
+        if model.circular_storage:
+            t_prev = prev_circular(model.T,t)
+        else:
+            if t == model.T.first():
+                return model.m_dot_hpt_Delta_dn[t] == 0
+            t_prev = t - 1
         return model.m_dot_hpt_Delta_dn[t] >= model.m_dot_hpt[t_prev] - model.m_dot_hpt[t]
     model.hpt_track_down = pyo.Constraint(model.T, rule=hpt_track_down)
     
@@ -149,21 +215,56 @@ def build_model(N, Schedule_elec, Schedule_effic, price_mults=None, cost_mults=N
     
     
     # conserves mass in hot tes
-    def hot_tes_inventory(model, t):  
-        t_prev = prev_circular(model.T,t)
-        return model.m_hot_tes[t] == (model.M_dot_salt[t] - model.m_dot_hot_tes[t]) * model.Convert_time * model.Delta_t + model.m_hot_tes[t_prev]
+    def hot_tes_inventory(model, t):
+        if model.circular_storage:
+            t_prev = prev_circular(model.T, t)
+
+            return model.m_hot_tes[t] == model.m_hot_tes[t_prev] + (
+                model.M_dot_salt[t] - model.m_dot_hot_tes[t]
+            ) * model.Convert_time * model.Delta_t
+
+        else:
+            if t == model.T.first():
+                return model.m_hot_tes[t] == model.m_hot_tes_init + (
+                    model.M_dot_salt[t] - model.m_dot_hot_tes[t]
+                ) * model.Convert_time * model.Delta_t
+
+            t_prev = t - 1
+
+            return model.m_hot_tes[t] == model.m_hot_tes[t_prev] + (
+                model.M_dot_salt[t] - model.m_dot_hot_tes[t]
+            ) * model.Convert_time * model.Delta_t
     model.hot_tes_inventory = pyo.Constraint(model.T, rule=hot_tes_inventory)
+
     
     
     
     # conserves mass in cold tes low-temp tes inventory tracking between time steps
     def cold_tes_inventory(model, t):
-        t_prev = prev_circular(model.T,t)
-        return model.m_cold_tes[t] == model.m_cold_tes[t_prev] + (
-                model.K_hx2 * model.m_dot_extract[t] 
-                - sum(model.m_dot_cold_tes[t, p] for p in ['MED', 'CRY'])) * model.Delta_t
+        if model.circular_storage:
+            t_prev = prev_circular(model.T, t)
+
+            return model.m_cold_tes[t] == model.m_cold_tes[t_prev] + (
+                model.K_hx2 * model.m_dot_extract[t]
+                - sum(model.m_dot_cold_tes[t, p] for p in ['MED', 'CRY'])
+            ) * model.Convert_time * model.Delta_t
+
+        else:
+            if t == model.T.first():
+                return model.m_cold_tes[t] == model.m_cold_tes_init + (
+                    model.K_hx2 * model.m_dot_extract[t]
+                    - sum(model.m_dot_cold_tes[t, p] for p in ['MED', 'CRY'])
+                ) * model.Convert_time * model.Delta_t
+
+            t_prev = t - 1
+
+            return model.m_cold_tes[t] == model.m_cold_tes[t_prev] + (
+                model.K_hx2 * model.m_dot_extract[t]
+                - sum(model.m_dot_cold_tes[t, p] for p in ['MED', 'CRY'])
+            ) * model.Convert_time * model.Delta_t
     model.cold_tes_inventory = pyo.Constraint(model.T, rule=cold_tes_inventory)
-    
+
+
     
     
     # relates electricity used by each process to per unit requirements
@@ -182,14 +283,15 @@ def build_model(N, Schedule_elec, Schedule_effic, price_mults=None, cost_mults=N
     
     # routes cold storage to med or cry
     def cold_tes_balance(model, t, p):
-        return model.m_dot_cold_tes[t, p] * model.Delta_H_hx2_water * model.Delta_t == model.q_used[t, p]
+        return model.m_dot_cold_tes[t, p] * model.Delta_H_hx2_water  == model.q_used[t, p]
     model.cold_tes_balance = pyo.Constraint(model.T, model.processes, rule=cold_tes_balance)
     
     
     
     # relates heat used by each process to per unit requirements
     def heat_used_by_process(model, t, p):
-        return model.q_used[t, p] == model.Q_required[p] * model.v_dot_in[t, p]
+        thermal_mult = med_thermal_mult if p=="MED" else 1.0
+        return model.q_used[t, p] == thermal_mult *  model.Q_required[p] * model.v_dot_in[t, p]
     model.heat_used_by_process = pyo.Constraint(model.T, model.processes, rule=heat_used_by_process)
     
     
@@ -456,9 +558,16 @@ def build_model(N, Schedule_elec, Schedule_effic, price_mults=None, cost_mults=N
             return pyo.Constraint.Skip
         return model.f_ion_link[t,(p,q),i] <= model.M_ion[i] * model.y_link_active[(p,q)]
     model.ion_link_off = pyo.Constraint(model.T, model.links, model.ions, rule=ion_link_off)
-    
-    
-        
+
+
+
+    # restrict flow in ED diluate for faster solving
+    def ed_outflow(model, t):
+        return model.v_dot_dil[t,'ED'] <= 0.1 * model.v_dot_in[t,'ED']
+    model.ed_outflow = pyo.Constraint(model.T, rule=ed_outflow) 
+
+
+
     # enforces processes must be used if binary active
     def process_used_if_active(model,p):
         if p == 'SW':
@@ -486,12 +595,14 @@ def build_model(N, Schedule_elec, Schedule_effic, price_mults=None, cost_mults=N
       + model.Price_elec[t] * model.elec_sold[t] + model.Price_salt * sum(model.f_ion_in[t,'CRY', i] for i in model.ions)
       for t in model.T)
     
-    
+    ramping_cost_yr = annualize * model.Cost_ramp_power * sum(model.m_dot_hpt_Delta_up[t] + model.m_dot_hpt_Delta_dn[t] for t in model.T)    
+
+    process_ramping_cost_yr = annualize * sum( 0.05 * (model.v_dot_process_Delta_up[t,p] + model.v_dot_process_Delta_dn[t,p]) for t in model.T for p in model.processes)
     
     capex_total = sum(model.K_process[p] * model.v_dot_cap[p] for p in model.processes) + model.Cost_tes_cold*model.m_cold_tes_max + model.Cost_tes_hot*model.m_hot_tes_max  
     capex_yr    = model.capital_recovery_factor * capex_total
     
-    model.obj   = pyo.Objective(expr=(profit_yr-capex_yr), sense=pyo.maximize)
+    model.obj   = pyo.Objective(expr=(profit_yr-capex_yr-ramping_cost_yr-process_ramping_cost_yr), sense=pyo.maximize)
     
                             
     solver  = pyo.SolverFactory("gurobi")

@@ -39,8 +39,7 @@ def run_1d_sensitivity(sweep_params, verbose):
     
     results_dir = os.path.join(wd, "results", f"sweep_1var_{sweep_name}")
     os.makedirs(results_dir, exist_ok=True)
-    
-    # 
+     
     
     summary_data = []
 

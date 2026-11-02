@@ -18,3 +18,5 @@ ENV LD_LIBRARY_PATH="${GUROBI_HOME}/lib:${LD_LIBRARY_PATH}"
 ENV GRB_LICENSE_FILE=/software/groups/gurobi_opt/gurobi.lic
 
 RUN ln -s /usr/bin/python3 /usr/bin/python
+
+WORKDIR /

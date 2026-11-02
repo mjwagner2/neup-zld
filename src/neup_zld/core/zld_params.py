@@ -130,26 +130,26 @@ def add_process_params(
        
        # base electricity requirements (units: kWh-e/m^3)
        elec_base = {
-           'RO':  4.5,
+           'RO':  1.5,
            'MED': 1.0,
-           'ED':  3.5,
-           'CRY': 3.5}
+           'ED':  5.0,
+           'CRY': 1.0}
        
        
        # base heat requirements (units:kWht-h/m^3)
        heat_base = {
            'RO':  0.0,
-           'MED': 25.0,
+           'MED': 31.0,
            'ED':  0.0,
-           'CRY': 90.0}
+           'CRY': 100.0}
        
        
        # capex base cost for each process
        capex_base = {
-           'RO':  500.0,
-           'MED': 900.0,
-           'ED':  200.0,
-           'CRY': 950.0}
+           'RO':  700.0,
+           'MED': 2000.0,
+           'ED':  1000.0,
+           'CRY': 3000.0}
        
 
        # electricity requirements, sweepable
@@ -183,7 +183,8 @@ def add_economic_params(model, price_scale=None, cost_scale=None):
     # base prices
     price_base    = {
         "water":        1.0,      # units: $/m^3
-        "lithium":      70.0      # units: $/kg
+        "lithium":      70.0,     # units: $/kg
+        "salt":         0.01      # units: $/kg
     }
 
 
@@ -198,11 +199,11 @@ def add_economic_params(model, price_scale=None, cost_scale=None):
     # commodity prices, scaled independently
     model.Price_water     = pyo.Param(initialize=scale(price_base["water"], "water", price_scale))
     model.Price_li        = pyo.Param(initialize=scale(price_base["lithium"], "lithium", price_scale))
-    model.Price_salt      = pyo.Param(initialize=0.0)
+    model.Price_salt      = pyo.Param(initialize=scale(price_base["salt"], "salt", price_scale))
 
 
     # power ramping cost scales with installed capacity 
-    model.Cost_ramp_power = pyo.Param(initialize=scale(cost_base["ramp_power"], "ramp_power", cost_scale)*model.W_dot_inst.value/model.M_dot_hx1_steam_nom.value)
+    model.Cost_ramp_power = pyo.Param(initialize=scale(cost_base["ramp_power"], "ramp_power", cost_scale)*model.W_dot_ref.value/model.M_dot_hx1_steam_nom.value)
 
 
     # tes costs, converted from $/kWh to $/kg
@@ -240,8 +241,8 @@ def add_zld_params(model, yield_scale=1.0):
 
     
     # recovery ratios & zld parameters
-    model.Recovery_ro        = pyo.Param(initialize=0.50)             # units: --,           recovery ratio for ro
-    model.Recovery_sw_to_med = pyo.Param(initialize=0.77)             # units: --,           recovery ratio for med fed from seawater
+    model.Recovery_ro        = pyo.Param(initialize=0.42)             # units: --,           recovery ratio for ro
+    model.Recovery_sw_to_med = pyo.Param(initialize=0.73)             # units: --,           recovery ratio for med fed from seawater
     model.Recovery_ro_to_med = pyo.Param(initialize=0.53)             # units: --,           recovery ratio for med fed from ro brine
     model.Ratio_na_to_li     = pyo.Param(initialize=5.0)              # units: --,           ratio needed for precipitation of lithium
     
@@ -255,11 +256,11 @@ def add_zld_params(model, yield_scale=1.0):
     
     
     # little m parameter
-    model.V_dot_min          = pyo.Param(initialize=1e-3)
+    model.V_dot_min          = pyo.Param(initialize=10)
 
     # calculate m for each ion
     def m_ion_init(model, i):
-        return pyo.value(model.V_dot_max) * 20.0 * pyo.value(model.Conc_sw[i])
+        return pyo.value(model.V_dot_max)  * pyo.value(model.Conc_sw[i])
     
     model.M_ion              = pyo.Param(model.ions, initialize=m_ion_init)
 
