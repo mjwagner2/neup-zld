@@ -8,6 +8,7 @@ dispatch_plots/
 sweeps/
 src/neup_zld/sweeps
 src/neup_zld/results
+liz_graphics/
 
 
 ## Python .gitignore template file defaults:
