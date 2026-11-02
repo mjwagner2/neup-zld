@@ -208,8 +208,8 @@ def main():
      # Load data
     elec_des = get_series(
         [
-            os.path.join("data_lmp", f"lmp_{args.des_file}.csv"),
-            os.path.join("data", "data_lmp", f"lmp_{args.des_file}.csv"),
+            os.path.join("src/neup_zld/data_lmp", f"lmp_{args.des_file}.csv"),
+            os.path.join("src/neup_zld/data", "data_lmp", f"lmp_{args.des_file}.csv"),
         ],
         "LMP",
         n_expected=24,
@@ -217,8 +217,8 @@ def main():
 
     elec_disp = get_series(
         [
-            os.path.join("data_lmp", f"lmp_{args.disp_file}.csv"),
-            os.path.join("data", "data_lmp", f"lmp_{args.disp_file}.csv"),
+            os.path.join("src/neup_zld/data_lmp", f"lmp_{args.disp_file}.csv"),
+            os.path.join("src/neup_zld/data", "data_lmp", f"lmp_{args.disp_file}.csv"),
         ],
         "LMP",
         n_expected=8760,
@@ -226,8 +226,8 @@ def main():
 
     eff_des = get_series(
         [
-            os.path.join("data_effic", f"effic_{args.des_file}.csv"),
-            os.path.join("data", "data_effic", f"effic_{args.des_file}.csv"),
+            os.path.join("src/neup_zld/data_effic", f"effic_{args.des_file}.csv"),
+            os.path.join("src/neup_zld/data", "data_effic", f"effic_{args.des_file}.csv"),
         ],
         "Efficiency",
         n_expected=24,
@@ -235,8 +235,8 @@ def main():
 
     eff_disp = get_series(
         [
-            os.path.join("data_effic", f"effic_{args.disp_file}.csv"),
-            os.path.join("data", "data_effic", f"effic_{args.disp_file}.csv"),
+            os.path.join("src/neup_zld/data_effic", f"effic_{args.disp_file}.csv"),
+            os.path.join("src/neup_zld/data", "data_effic", f"effic_{args.disp_file}.csv"),
         ],
         "Efficiency",
         n_expected=8760,
