@@ -12,16 +12,16 @@ arguments = --job_id $(job_id) --group $(group) --des_file $(des_file) --disp_fi
 
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT
-transfer_input_files = run_job.sh, htc_worker.py, zld_dynamic.py, zld_params.py, zld_power_cycle_calcs.py, data/
+transfer_input_files = src/
 transfer_output_files = results
 
 log    = logs/job_$(group)_$(job_id).log
 error  = logs/job_$(group)_$(job_id).err
 output = logs/job_$(group)_$(job_id).out
 
-request_cpus = 15
-request_memory = 48GB
-request_disk = 5GB
+request_cpus = 10
+request_memory = 25GB
+request_disk = 2.5GB
 
 queue job_id, group, des_file, disp_file, li_price, water_price, salt_price, ctes_price, htes_price, capex_ro, capex_med, capex_ed, capex_cry, energy_ro, energy_med, energy_ed, energy_cry, turbine_mult, thermal_med  from sweep_WaterMEDThermal.csv
 

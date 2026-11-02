@@ -11,7 +11,7 @@ def build_model(N, Schedule_elec, Schedule_effic, price_mults=None, cost_mults=N
     process_mults = process_mults or {}
     med_thermal_mult = float(process_mults.get("MED_thermal", 1.0))
 
-    from core.zld_params import (
+    from zld_params import (
         add_sets,
         add_time_set,
         add_time_series_params,

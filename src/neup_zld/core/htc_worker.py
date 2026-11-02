@@ -24,7 +24,7 @@ def save_debug_file(path, outdir):
         shutil.copy(path, os.path.join(outdir, os.path.basename(path)))
 
 
-from core.zld_dynamic import build_model
+from zld_dynamic import build_model
 
 
 def write_dispatch_csv(model_disp, hourly_filename):
@@ -180,8 +180,8 @@ def main():
     # Bundle dictionaries for model
     prices = {
         "lithium": args.li_price,
-        "water": args.water_price,
-        "salt":args.salt_price,
+        "water":   args.water_price,
+        "salt":    args.salt_price,
     }
 
     costs = {
@@ -195,8 +195,8 @@ def main():
         "ED_capex": args.capex_ed,
         "CRY_capex":args.capex_cry,
         "RO_elec": args.energy_ro,
-	"MED_elec": args.energy_med,
-	"ED_elec": args.energy_ed,
+	    "MED_elec": args.energy_med,
+	    "ED_elec": args.energy_ed,
         "CRY_elec":args.energy_cry,
         "MED_thermal":args.thermal_med,
     }
