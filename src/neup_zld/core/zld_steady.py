@@ -37,7 +37,8 @@ def main(Li_price=70,ED_elec_req=3.5,RO_elec_req=4.5,MED_elec_req=1.0):
     
     model = pyo.ConcreteModel()
     
-    
+
+
     # SETS 
     
     # set of processes available for use
