@@ -9,7 +9,8 @@ sweeps/
 src/neup_zld/sweeps
 src/neup_zld/results
 liz_graphics/
-
+_archive_files/
+results/
 
 ## Python .gitignore template file defaults:
 

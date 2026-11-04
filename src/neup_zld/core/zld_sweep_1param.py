@@ -6,7 +6,7 @@ import sys
 import csv
 import glob
 from zld_dynamic import build_model
-import helpers
+import _archive_files.helpers as helpers
 
 wd = sys.path[0]
 
